@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css">
+    <link rel="stylesheet" href="connect.css" />
+    <meta name="minimizeable" content="0">
+    <meta name="maximizeable" content="0">
+    <meta name="titlebar-themecolor" content="#1e1e1e">
+</head>
+<body>
+    <div>
+        <div class="form-container">
+            <form>
+                <label class="username mdc-text-field mdc-text-field--outlined">
+                    <span class="mdc-notched-outline">
+                        <span class="mdc-notched-outline__leading"></span>
+                        <span class="mdc-notched-outline__notch">
+                            <span class="mdc-floating-label" id="username">Username</span>
+                        </span>
+                        <span class="mdc-notched-outline__trailing"></span>
+                    </span>
+                    <input type="text" class="mdc-text-field__input" aria-labelledby="username" id="username-input">
+                </label>
+                <br>
+                <br>
+                <label class="password mdc-text-field mdc-text-field--outlined">
+                    <span class="mdc-notched-outline">
+                        <span class="mdc-notched-outline__leading"></span>
+                        <span class="mdc-notched-outline__notch">
+                            <span class="mdc-floating-label" id="password">Password</span>
+                        </span>
+                        <span class="mdc-notched-outline__trailing"></span>
+                    </span>
+                    <input type="password" class="mdc-text-field__input" aria-labelledby="password" id="password-input">
+                </label>
+                <br>
+                <br>
+                <label class="server mdc-text-field mdc-text-field--outlined">
+                    <span class="mdc-notched-outline">
+                        <span class="mdc-notched-outline__leading"></span>
+                        <span class="mdc-notched-outline__notch">
+                            <span class="mdc-floating-label" id="server">Server IP</span>
+                        </span>
+                        <span class="mdc-notched-outline__trailing"></span>
+                    </span>
+                    <input type="server" class="mdc-text-field__input" aria-labelledby="server" id="server-input">
+                </label>
+                <button class="button-9" type="submit">Connect</button>
+    
+            </form>
+            <span style="color: #B00020;" id="error"></span>
+        </div>
+    </div>
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+    <script src="connect.js"></script>
+</body>
+</html>

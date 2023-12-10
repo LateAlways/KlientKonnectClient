@@ -1,0 +1,18 @@
+{
+  "name": "klientkonnect-client",
+  "version": "1.0.0",
+  "description": "KlientKonnect screenshare client",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "tsc && electron dist/main.js"
+  },
+  "author": "LateAlways",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "custom-electron-titlebar": "^4.2.7"
+  }
+}

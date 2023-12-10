@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="app.css" />
+    <meta name="maximizeable" content="0">
+    <meta name="minimizeable" content="1">
+    <meta name="titlebar-themecolor" content="#1e1e1e">
+</head>
+<body>
+    <div class="app">
+        <div class="info">
+            <p><strong>Username: </strong><span id="username"></span></p>
+            <p><strong>Server: </strong><span id="server"></span></p>
+        </div>
+        <div class="screenshare-settings">
+            <button id="select">Select source</button>
+            <p>Source: <span id="streaming-src"></span></p>
+            <button id="screenshare">Screenshare</button>
+        </div>
+        <div>
+            <button id="logout">Log-out</button>
+        </div>
+        <video src="" hidden></video>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
