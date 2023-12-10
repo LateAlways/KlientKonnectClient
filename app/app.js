@@ -46,25 +46,47 @@ let screensharing = false;
 let resolution
 let offscreen
 fetch("http://" + server + "/api/resolution").then(res => res.json()).then(text => { resolution = text; offscreen = new OffscreenCanvas(resolution.width, resolution.height); offscreen = offscreen.getContext("2d", { willReadFrequently: true })});
-let ws = new WebSocket("ws://" + server + "/");
-ws.onopen = function (event) {
-    console.log("Connected to server!");
-    ws.send(password);
+let ws = null;
+let reconnectInterval = 2000; // milliseconds
+let reconnectTimer = null;
+
+function connectWebSocket() {
+    ws = new WebSocket("ws://" + server + "/");
+    ws.binaryType = "arraybuffer";
+    ws.onopen = function (event) {
+        console.log("Connected to server!");
+        ws.send(password);
+        clearInterval(reconnectTimer);
+    }
+
+    ws.onclose = function (event) {
+        console.log("Disconnected from server!");
+        screensharing = false;
+        document.getElementById("screenshare").innerText = "Screenshare";
+        reconnect();
+    }
+
+    ws.onmessage = function (event) {
+        console.log(event.data);
+        if(event.data == "connectfailure:already") {
+            ipcRenderer.invoke("showAlert", "Someone is already sharing their screen!");
+        }
+        if(event.data == "reqfullimage") {
+            getFullFrame();
+        }
+        if(incomingMessage) {
+            incomingMessage(event.data);
+        }
+    }
 }
 
-let incomingMessage;
-ws.onmessage = function (event) {
-    console.log(event.data);
-    if(event.data == "connectfailure:already") {
-        ipcRenderer.invoke("showAlert", "Someone is already sharing their screen!");
-    }
-    if(event.data == "reqfullimage") {
-        getFullFrame();
-    }
-    if(incomingMessage) {
-        incomingMessage(event.data);
+function reconnect() {
+    if (!reconnectTimer) {
+        reconnectTimer = setInterval(connectWebSocket, reconnectInterval);
     }
 }
+
+connectWebSocket();
 
 let last_frame = null;
 function encodeImageDataToLATFILE(image, full) {
@@ -75,10 +97,10 @@ function encodeImageDataToLATFILE(image, full) {
     4 bytes colormap length/3 uint32
     3 bytes per color uint8
     4 bytes pixels length uint32
-    4 bytes per pixel {
+    4-6 bytes per pixel {
+        2 bytes colorswitch? uint16
         2 bytes x uint16
         2 bytes y uint16
-        2 bytes colorswitch? uint16
     }
     */
     let message = [];
@@ -127,7 +149,7 @@ function encodeImageDataToLATFILE(image, full) {
     }
     last_frame = image.data;
 
-    if(colorMap.length !== 0) {
+    if(colorMap.length !== 0 && Object.keys(pixels).length !== 0) {
         message.push(Buffer.from(new Uint32Array([colorMap.length]).buffer));
         colorMap = [].concat.apply([], colorMap)
         message.push(Buffer.from(colorMap));
@@ -135,12 +157,11 @@ function encodeImageDataToLATFILE(image, full) {
         let pixelsLength = 0;
         let pixelss = [];
         for(let colormap_index=0; colormap_index < pixelSize; colormap_index++) {
-            if(colormap_index !== 0) pixelss.push(Buffer.from([0xEF,0xEF]));
+            if(colormap_index !== 0) pixelss.push(Buffer.from([239,239]));
             for(let pixel_index = 0; pixel_index < pixels[colormap_index].length; pixel_index++){
                 let pixel = pixels[colormap_index][pixel_index];
                 pixelss.push(Buffer.from(new Uint16Array(pixel).buffer));
                 pixelsLength++;
-                
             }
         }
         messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss)]);
@@ -150,7 +171,7 @@ function encodeImageDataToLATFILE(image, full) {
 
 function getFullFrame() {
     offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
-    return encodeImageDataToLATFILE(offscreen.getImageData(0, 0, resolution.width, resolution.height), true);
+    encodeImageDataToLATFILE(offscreen.getImageData(0, 0, resolution.width, resolution.height), true);
 }
 
 function onFrame(timestamp, frame) {
@@ -201,6 +222,7 @@ document.getElementById("screenshare").addEventListener("click", () => {
     if(screensharing) {
         screensharing = false;
         ws.send("disconnect")
+        last_frame = null;
         document.getElementById("screenshare").innerText = "Screenshare";
     } else {
         new Promise((resolve, reject) => {

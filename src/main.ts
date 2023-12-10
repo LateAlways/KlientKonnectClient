@@ -15,15 +15,14 @@ const createWindow = () => {
             preload: path.join(__dirname, '../app/preload.js'),
             backgroundThrottling: false,
             nodeIntegration: true,
-            contextIsolation: false
+            contextIsolation: false,
         },
         titleBarStyle: 'hidden',
     });
     win.setBounds({ width: 200, height: 350 })
     Menu.setApplicationMenu(null);
-
-    win.webContents.openDevTools();
     win.webContents.setFrameRate(240);
+    
     win.setTitle("KlientKonnect Client");
     win.setIcon(nativeImage.createFromPath(path.join(__dirname, '../assets/icon.png')));
 
@@ -32,12 +31,14 @@ const createWindow = () => {
 
 ipcMain.on("loadApp", (event, arg) => {
     win.loadFile(path.join(__dirname, '../app/app.html'));
-    win.setBounds({ width: 210, height: 400 })
+    win.setBounds({ width: 210, height: 400 });
+    win.webContents.setFrameRate(240);
 });
 
 ipcMain.on("loadConnect", (event, arg) => {
     win.setBounds({ width: 200, height: 350 })
     win.loadFile(path.join(__dirname, '../app/connect.html'));
+    win.webContents.setFrameRate(240);
 });
 
 ipcMain.handle("getSources", async (event, arg) => {
