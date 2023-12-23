@@ -1,18 +1,64 @@
 {
-  "name": "klientkonnect-client",
+  "name": "klientkonnect.client",
   "version": "1.0.0",
   "description": "KlientKonnect screenshare client",
   "main": "dist/main.js",
   "scripts": {
-    "start": "tsc && electron dist/main.js"
+    "start": "tsc && electron dist/main.js",
+    "package": "tsc && electron-builder build"
   },
   "author": "LateAlways",
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
+    "electron-builder": "^22.11.7",
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "custom-electron-titlebar": "^4.2.7"
+    "custom-electron-titlebar": "^4.2.7",
+    "electron-builder-squirrel-windows": "^24.10.0"
+  },
+  "build": {
+    "appId": "dev.latealways.klientkonnect",
+    "productName": "KlientKonnect",
+    "directories": {
+      "output": "build"
+    },
+    "win": {
+      "target": "squirrel",
+      "icon": "assets/kklounges.ico"
+    },
+    "appx": {
+      "applicationId": "dev.latealways.klientkonnect",
+      "displayName": "KlientKonnect",
+      "identityName": "dev.latealways.klientkonnect",
+      "publisher": "CN=LateAlways",
+      "publisherDisplayName": "LateAlways",
+      "showNameOnTiles": "true"
+    },
+    "squirrelWindows": {
+      "iconUrl": "https://latealways.is-a-good.dev/kklounges.ico",
+      "loadingGif": "assets/kklounges.gif",
+      "useAppIdAsId": true
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/kklounges.icns"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 130,
+          "y": 150,
+          "type": "file"
+        }
+      ]
+    }
   }
 }

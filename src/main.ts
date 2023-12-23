@@ -1,8 +1,54 @@
 import { app, BrowserWindow, Menu, ipcMain, nativeImage, desktopCapturer, ipcRenderer, dialog } from 'electron';
 import * as path from 'path';
 import { setupTitlebar, attachTitlebarToWindow } from "custom-electron-titlebar/main";
+import * as cp from 'child_process';
 
-app.commandLine.appendSwitch ("disable-http-cache");
+if (handleSquirrelEvent()) {
+    app.quit();
+}
+
+app.commandLine.appendSwitch("disable-http-cache");
+
+function executeSquirrelCommand(args: any, done: any) {
+    let updateDotExe = path.resolve(path.dirname(process.execPath),
+        '..', 'Update.exe');
+    let child = cp.spawn(updateDotExe, args, { detached: true });
+
+    child.on('close', function (code) {
+        done();
+    });
+};
+
+function install(done: any) {
+    let target = path.basename(process.execPath);
+    executeSquirrelCommand(["--createShortcut", target], done);
+};
+
+function uninstall(done: any) {
+    let target = path.basename(process.execPath);
+    executeSquirrelCommand(["--removeShortcut", target], done);
+};
+
+function handleSquirrelEvent() {
+    let squirrelEvent = process.argv[1];
+
+    switch (squirrelEvent) {
+        case '--squirrel-install':
+            install(app.quit);
+            return true;
+        case '--squirrel-updated':
+            install(app.quit);
+            return true;
+        case '--squirrel-obsolete':
+            app.quit();
+            return true;
+        case '--squirrel-uninstall':
+            uninstall(app.quit);
+            return true;
+    }
+
+    return false;
+}
 
 setupTitlebar();
 let win: BrowserWindow;
@@ -22,8 +68,9 @@ const createWindow = () => {
     win.setBounds({ width: 200, height: 350 })
     Menu.setApplicationMenu(null);
     win.webContents.setFrameRate(240);
-    
+
     win.setTitle("KlientKonnect Client");
+    win.webContents.toggleDevTools();
     win.setIcon(nativeImage.createFromPath(path.join(__dirname, '../assets/icon.png')));
 
     win.loadFile(path.join(__dirname, '../app/connect.html'))
@@ -46,7 +93,7 @@ ipcMain.handle("getSources", async (event, arg) => {
 });
 
 ipcMain.on("getSource", async (event, arg) => {
-    if(!win2) {
+    if (!win2) {
         win2 = new BrowserWindow({
             resizable: false,
             width: 200,
@@ -87,3 +134,7 @@ ipcMain.handle("showAlert", async (event, arg) => {
 app.whenReady().then(() => {
     createWindow()
 })
+
+if(!app.requestSingleInstanceLock()) {
+    app.quit();
+}

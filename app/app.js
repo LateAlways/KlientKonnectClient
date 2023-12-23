@@ -42,7 +42,7 @@ if(!server || !username || !password || !checkLogin(username, password, server))
 }
 
 let screensharing = false;
-
+let incomingMessage = null;
 let resolution
 let offscreen
 fetch("http://" + server + "/api/resolution").then(res => res.json()).then(text => { resolution = text; offscreen = new OffscreenCanvas(resolution.width, resolution.height); offscreen = offscreen.getContext("2d", { willReadFrequently: true })});
@@ -86,6 +86,29 @@ function reconnect() {
     }
 }
 
+const ctx = new AudioContext({sinkId: { type: 'none' }});
+let audioSrc;
+let analyser;
+function getFrequency() {
+    let l = new Uint8Array(analyser.frequencyBinCount);
+
+    analyser.getByteFrequencyData(l);
+
+    let totalFrequency = 0;
+    let totalCount = 0;
+    for(let i = 0; i < analyser.frequencyBinCount; i++) {
+        const frequency = i * ctx.sampleRate / (2 * analyser.fftSize);
+        const value = l[i];
+
+        if (value > 0) {
+            totalFrequency += frequency;
+            totalCount++;
+        }
+    }
+    console.log(Math.floor((totalCount > 0 ? totalFrequency / totalCount : 0)))
+    return Math.floor((totalCount > 0 ? totalFrequency / totalCount : 0));
+}
+
 connectWebSocket();
 
 let last_frame = null;
@@ -102,6 +125,8 @@ function encodeImageDataToLATFILE(image, full) {
         2 bytes x uint16
         2 bytes y uint16
     }
+    2 bytes frequency size uint16
+    list*2 bytes frequency uint16
     */
     let message = [];
     if(full) {
@@ -164,7 +189,7 @@ function encodeImageDataToLATFILE(image, full) {
                 pixelsLength++;
             }
         }
-        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss)]);
+        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss), Buffer.from(new Uint16Array([getFrequency()]).buffer)]);
         ws.send(messageSend);
     }
 }
@@ -175,11 +200,11 @@ function getFullFrame() {
 }
 
 function onFrame(timestamp, frame) {
+    requestAnimationFrame(onFrame);
     if(screensharing) {
         offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
         encodeImageDataToLATFILE(offscreen.getImageData(0, 0, resolution.width, resolution.height), false);
     }
-    video.requestVideoFrameCallback(onFrame);
 }
 
 document.getElementById("username").innerHTML = username;
@@ -199,7 +224,12 @@ const video = document.querySelector('video')
 ipcRenderer.on("setSource", (event, args) => {
     document.getElementById("streaming-src").innerText = args.name.substring(0, 10) + (args.name.length <= 10 ? "" : "...");
     navigator.webkitGetUserMedia({
-        audio: false,
+        audio: {
+            mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: args.id,
+            }
+        },
         video: {
             mandatory: {
                 chromeMediaSource: 'desktop',
@@ -208,11 +238,19 @@ ipcRenderer.on("setSource", (event, args) => {
             }
         }
       }, (stream) => {
-        video.srcObject = stream
+        video.srcObject = stream;
+        audioSrc = ctx.createMediaStreamSource(stream);
+
+        analyser = ctx.createAnalyser();
+        analyser.connect(ctx.destination)
+        audioSrc.connect(analyser);
+        analyser.fftSize = 2048;
+
         video.onloadedmetadata = (e) => {
           video.play()
         }
-        video.requestVideoFrameCallback(onFrame);
+
+        onFrame();
       }, (err) => {
         console.log(err)
       });
