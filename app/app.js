@@ -234,7 +234,7 @@ ipcRenderer.on("setSource", (event, args) => {
             mandatory: {
                 chromeMediaSource: 'desktop',
                 chromeMediaSourceId: args.id,
-                frameRate: 60,
+                frameRate: 240,
             }
         }
       }, (stream) => {
