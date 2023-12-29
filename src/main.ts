@@ -70,7 +70,7 @@ const createWindow = () => {
     win.webContents.setFrameRate(240);
 
     win.setTitle("KlientKonnect Client");
-    win.webContents.toggleDevTools();
+    win.webContents.openDevTools();
     win.setIcon(nativeImage.createFromPath(path.join(__dirname, '../assets/icon.png')));
 
     win.loadFile(path.join(__dirname, '../app/connect.html'))

@@ -5,6 +5,7 @@ const password = localStorage.getItem("password");
 const {
 	ipcRenderer
 } = require("electron");
+const { WebSocket } = require("ws");
 
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
@@ -51,33 +52,35 @@ let reconnectInterval = 2000; // milliseconds
 let reconnectTimer = null;
 
 function connectWebSocket() {
-    ws = new WebSocket("ws://" + server + "/");
+    ws = new WebSocket("wss://" + server + "/");
+
     ws.binaryType = "arraybuffer";
-    ws.onopen = function (event) {
+    ws.on("open", function (event) {
         console.log("Connected to server!");
         ws.send(password);
         clearInterval(reconnectTimer);
-    }
+    })
 
-    ws.onclose = function (event) {
+    ws.on("close", function (event) {
         console.log("Disconnected from server!");
         screensharing = false;
         document.getElementById("screenshare").innerText = "Screenshare";
         reconnect();
-    }
+    })
 
-    ws.onmessage = function (event) {
-        console.log(event.data);
-        if(event.data == "connectfailure:already") {
+    ws.on("message", function (msg) {
+        msg = msg.toString();
+        console.log(msg);
+        if(msg == "connectfailure:already") {
             ipcRenderer.invoke("showAlert", "Someone is already sharing their screen!");
         }
-        if(event.data == "reqfullimage") {
+        if(msg == "reqfullimage") {
             getFullFrame();
         }
         if(incomingMessage) {
-            incomingMessage(event.data);
+            incomingMessage(msg);
         }
-    }
+    })
 }
 
 function reconnect() {
@@ -94,19 +97,17 @@ function getFrequency() {
 
     analyser.getByteFrequencyData(l);
 
-    let totalFrequency = 0;
-    let totalCount = 0;
-    for(let i = 0; i < analyser.frequencyBinCount; i++) {
-        const frequency = i * ctx.sampleRate / (2 * analyser.fftSize);
-        const value = l[i];
-
-        if (value > 0) {
-            totalFrequency += frequency;
-            totalCount++;
-        }
+    // transform l into a normal []
+    let arr = [];
+    for(let i = 0; i < l.length; i++) {
+        arr.push(Math.floor(Math.pow(10, byteToDecibel(l[i])/10)*255));
     }
-    console.log(Math.floor((totalCount > 0 ? totalFrequency / totalCount : 0)))
-    return Math.floor((totalCount > 0 ? totalFrequency / totalCount : 0));
+    
+    return arr
+}
+function byteToDecibel(byte) {
+    const MINIMUM_POSITIVE_VALUE = 1e-6;
+    return 20 * Math.log10((byte == 0 ? MINIMUM_POSITIVE_VALUE : byte) / 255);
 }
 
 connectWebSocket();
@@ -125,8 +126,7 @@ function encodeImageDataToLATFILE(image, full) {
         2 bytes x uint16
         2 bytes y uint16
     }
-    2 bytes frequency size uint16
-    list*2 bytes frequency uint16
+    2 bytes frequency uint16
     */
     let message = [];
     if(full) {
@@ -185,11 +185,11 @@ function encodeImageDataToLATFILE(image, full) {
             if(colormap_index !== 0) pixelss.push(Buffer.from([239,239]));
             for(let pixel_index = 0; pixel_index < pixels[colormap_index].length; pixel_index++){
                 let pixel = pixels[colormap_index][pixel_index];
-                pixelss.push(Buffer.from(new Uint16Array(pixel).buffer));
+                pixelss.push(Buffer.from(new Uint16Array([pixel[1]*resolution.width+pixel[0]]).buffer));
                 pixelsLength++;
             }
         }
-        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss), Buffer.from(new Uint16Array([getFrequency()]).buffer)]);
+        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss), Buffer.from(new Uint8Array(getFrequency()).buffer)]);
         ws.send(messageSend);
     }
 }
@@ -226,6 +226,7 @@ ipcRenderer.on("setSource", (event, args) => {
     navigator.webkitGetUserMedia({
         audio: {
             mandatory: {
+                echoCancellation: true,
                 chromeMediaSource: 'desktop',
                 chromeMediaSourceId: args.id,
             }
@@ -234,7 +235,7 @@ ipcRenderer.on("setSource", (event, args) => {
             mandatory: {
                 chromeMediaSource: 'desktop',
                 chromeMediaSourceId: args.id,
-                frameRate: 240,
+                frameRate: 60,
             }
         }
       }, (stream) => {
@@ -244,7 +245,8 @@ ipcRenderer.on("setSource", (event, args) => {
         analyser = ctx.createAnalyser();
         analyser.connect(ctx.destination)
         audioSrc.connect(analyser);
-        analyser.fftSize = 2048;
+        analyser.fftSize = 256;
+        console.log(ctx.sampleRate);
 
         video.onloadedmetadata = (e) => {
           video.play()

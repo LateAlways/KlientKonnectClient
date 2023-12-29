@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "custom-electron-titlebar": "^4.2.7",
-    "electron-builder-squirrel-windows": "^24.10.0"
+    "electron-builder-squirrel-windows": "^24.10.0",
+    "ws": "^8.16.0"
   },
   "build": {
     "appId": "dev.latealways.klientkonnect",
@@ -60,5 +61,8 @@
         }
       ]
     }
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.0.8"
   }
 }
