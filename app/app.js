@@ -113,7 +113,7 @@ function byteToDecibel(byte) {
 connectWebSocket();
 
 let last_frame = null;
-function encodeImageDataToLATFILE(image, full) {
+const encodeImageDataToLATFILE = function(ws, resolution, image, full, last_frame) {
     /* STRUCTURE OF LATFILE
     if full then ( 12 bytes reqfullimage marker ) DONE
     10 bytes LATFILE?ENC marker
@@ -128,51 +128,46 @@ function encodeImageDataToLATFILE(image, full) {
     }
     2 bytes frequency uint16
     */
-    let message = [];
+    const message = [];
     if(full) {
         message.push(Buffer.from("reqfullimage"));
     }
     message.push(Buffer.from("LATFILE?ENC"));
     message.push(Buffer.from([60]));
     let colorMap = [];
-    let realX = 0;
     let pixels = {};
-    for(let y=0; y<resolution.height; y++) {
-        for(let x=0; x<resolution.width; x++) {
-            let red = image.data[realX];
-            let green = image.data[realX+1];
-            let blue = image.data[realX+2];
+    for(let x=0; x<resolution.width*resolution.height; x++) {
+        let red = image.data[x*4];
+        let green = image.data[x*4+1];
+        let blue = image.data[x*4+2];
 
-            if(!full && last_frame !== null) {
-                let changeRed = last_frame[realX] != red;
-                let changeGreen = last_frame[realX+1] != green;
-                let changeBlue = last_frame[realX+2] != blue;
-                if(changeRed || changeGreen || changeBlue) {
-                    let colormap = colorMap.findIndex(item => item[0] == red && item[1] == green && item[2] == blue);
-    
-                    if(colormap == -1) {
-                        colormap = colorMap.length;
-                        colorMap.push([red, green, blue]);
-                    }
-    
-                    if(!pixels[colormap]) pixels[colormap] = [[x,y]];
-                    else pixels[colormap].push([x,y]);
-                }
-            } else {
+        if(!full && last_frame !== null) {
+            let changeRed = last_frame[x*4] != red;
+            let changeGreen = last_frame[x*4+1] != green;
+            let changeBlue = last_frame[x*4+2] != blue;
+            if(changeRed || changeGreen || changeBlue) {
                 let colormap = colorMap.findIndex(item => item[0] == red && item[1] == green && item[2] == blue);
-    
+
                 if(colormap == -1) {
                     colormap = colorMap.length;
                     colorMap.push([red, green, blue]);
                 }
 
-                if(!pixels[colormap]) pixels[colormap] = [[x,y]];
-                else pixels[colormap].push([x,y]);
+                if(!pixels[colormap]) pixels[colormap] = [x];
+                else pixels[colormap].push(x);
             }
-            realX+=4;
+        } else {
+            let colormap = colorMap.findIndex(item => item[0] == red && item[1] == green && item[2] == blue);
+
+            if(colormap == -1) {
+                colormap = colorMap.length;
+                colorMap.push([red, green, blue]);
+            }
+
+            if(!pixels[colormap]) pixels[colormap] = [x];
+            else pixels[colormap].push(x);
         }
     }
-    last_frame = image.data;
 
     if(colorMap.length !== 0 && Object.keys(pixels).length !== 0) {
         message.push(Buffer.from(new Uint32Array([colorMap.length]).buffer));
@@ -181,29 +176,33 @@ function encodeImageDataToLATFILE(image, full) {
         let pixelSize = Object.keys(pixels).length;
         let pixelsLength = 0;
         let pixelss = [];
-        for(let colormap_index=0; colormap_index < pixelSize; colormap_index++) {
+        for(let colormap_index = 0; colormap_index < pixelSize; colormap_index++) {
             if(colormap_index !== 0) pixelss.push(Buffer.from([239,239]));
             for(let pixel_index = 0; pixel_index < pixels[colormap_index].length; pixel_index++){
                 let pixel = pixels[colormap_index][pixel_index];
-                pixelss.push(Buffer.from(new Uint16Array([pixel[1]*resolution.width+pixel[0]]).buffer));
+                pixelss.push(Buffer.from(new Uint16Array([pixel]).buffer));
                 pixelsLength++;
             }
         }
         messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss), Buffer.from(new Uint8Array(getFrequency()).buffer)]);
         ws.send(messageSend);
     }
+    return 0;
 }
 
 function getFullFrame() {
     offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
-    encodeImageDataToLATFILE(offscreen.getImageData(0, 0, resolution.width, resolution.height), true);
+    let image = offscreen.getImageData(0, 0, resolution.width, resolution.height)
+    encodeImageDataToLATFILE(ws, resolution, image, true, last_frame);
+    last_frame = image
 }
 
 function onFrame(timestamp, frame) {
     requestAnimationFrame(onFrame);
     if(screensharing) {
-        offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
-        encodeImageDataToLATFILE(offscreen.getImageData(0, 0, resolution.width, resolution.height), false);
+        let image = offscreen.getImageData(0, 0, resolution.width, resolution.height)
+        encodeImageDataToLATFILE(ws, resolution, image, false, last_frame);
+        last_frame = image
     }
 }
 
