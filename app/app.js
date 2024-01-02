@@ -5,7 +5,7 @@ const password = localStorage.getItem("password");
 const {
 	ipcRenderer
 } = require("electron");
-const { WebSocket } = require("ws");
+//const { WebSocket } = require("ws");
 
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
@@ -54,6 +54,12 @@ let reconnectTimer = null;
 function connectWebSocket() {
     ws = new WebSocket("wss://" + server + "/");
 
+    if(ws.on === undefined) {
+        ws.on = function (event, callback) {
+            ws.addEventListener(event, callback);
+        }
+    }
+
     ws.binaryType = "arraybuffer";
     ws.on("open", function (event) {
         console.log("Connected to server!");
@@ -69,7 +75,11 @@ function connectWebSocket() {
     })
 
     ws.on("message", function (msg) {
-        msg = msg.toString();
+        if(msg instanceof MessageEvent) {
+            msg = msg.data;
+        } else {
+            msg = msg.toString();
+        }
         console.log(msg);
         if(msg == "connectfailure:already") {
             ipcRenderer.invoke("showAlert", "Someone is already sharing their screen!");
@@ -113,10 +123,10 @@ function byteToDecibel(byte) {
 connectWebSocket();
 
 let last_frame = null;
-const encodeImageDataToLATFILE = function(ws, resolution, image, full, last_frame) {
+const encodeImageDataToLATFILE = function(image, full) {
     /* STRUCTURE OF LATFILE
-    if full then ( 12 bytes reqfullimage marker ) DONE
-    10 bytes LATFILE?ENC marker
+    if full then ( 12 bytes reqfullimage marker )
+    11 bytes LATFILE?ENC marker
     1 byte fps
     4 bytes colormap length/3 uint32
     3 bytes per color uint8
@@ -193,16 +203,17 @@ const encodeImageDataToLATFILE = function(ws, resolution, image, full, last_fram
 function getFullFrame() {
     offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
     let image = offscreen.getImageData(0, 0, resolution.width, resolution.height)
-    encodeImageDataToLATFILE(ws, resolution, image, true, last_frame);
-    last_frame = image
+    encodeImageDataToLATFILE(image, true);
+    last_frame = image.data
 }
 
 function onFrame(timestamp, frame) {
     requestAnimationFrame(onFrame);
     if(screensharing) {
+        offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
         let image = offscreen.getImageData(0, 0, resolution.width, resolution.height)
-        encodeImageDataToLATFILE(ws, resolution, image, false, last_frame);
-        last_frame = image
+        encodeImageDataToLATFILE(image, false);
+        last_frame = image.data
     }
 }
 
