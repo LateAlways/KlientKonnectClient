@@ -5,7 +5,7 @@ const password = localStorage.getItem("password");
 const {
 	ipcRenderer
 } = require("electron");
-//const { WebSocket } = require("ws");
+const { WebSocket } = require("ws");
 
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
@@ -103,14 +103,15 @@ const ctx = new AudioContext({sinkId: { type: 'none' }});
 let audioSrc;
 let analyser;
 function getFrequency() {
-    let l = new Uint8Array(analyser.frequencyBinCount);
+    //let l = new Uint8Array(analyser.frequencyBinCount);
 
-    analyser.getByteFrequencyData(l);
+    //analyser.getByteFrequencyData(l);
 
     // transform l into a normal []
     let arr = [];
-    for(let i = 0; i < l.length; i++) {
-        arr.push(Math.floor(Math.pow(10, byteToDecibel(l[i])/10)*255));
+    for(let i = 0; i < /*l.length*/128; i++) {
+        //arr.push(Math.floor(Math.pow(10, byteToDecibel(l[i])/10)*255));
+        arr.push(0);
     }
     
     return arr
