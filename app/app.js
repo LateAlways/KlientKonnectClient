@@ -5,7 +5,7 @@ const password = localStorage.getItem("password");
 const {
 	ipcRenderer
 } = require("electron");
-///const { WebSocket } = require("ws");
+const { WebSocket } = require("ws");
 
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
