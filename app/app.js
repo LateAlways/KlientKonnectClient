@@ -99,9 +99,9 @@ function reconnect() {
     }
 }
 
-const ctx = new AudioContext({sinkId: { type: 'none' }});
+/*const ctx = new AudioContext({sinkId: { type: 'none' }});
 let audioSrc;
-let analyser;
+let analyser;*/
 function getFrequency() {
     //let l = new Uint8Array(analyser.frequencyBinCount);
 
@@ -195,7 +195,7 @@ const encodeImageDataToLATFILE = function(image, full) {
                 pixelsLength++;
             }
         }
-        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss), Buffer.from(new Uint8Array(getFrequency()).buffer)]);
+        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss)/*, Buffer.from(new Uint8Array(getFrequency()).buffer)*/]);
         ws.send(messageSend);
     }
     return 0;
@@ -235,13 +235,13 @@ const video = document.querySelector('video')
 ipcRenderer.on("setSource", (event, args) => {
     document.getElementById("streaming-src").innerText = args.name.substring(0, 10) + (args.name.length <= 10 ? "" : "...");
     navigator.webkitGetUserMedia({
-        audio: {
+        /*audio: {
             mandatory: {
                 echoCancellation: true,
                 chromeMediaSource: 'desktop',
                 chromeMediaSourceId: args.id,
             }
-        },
+        },*/
         video: {
             mandatory: {
                 chromeMediaSource: 'desktop',
@@ -251,13 +251,13 @@ ipcRenderer.on("setSource", (event, args) => {
         }
       }, (stream) => {
         video.srcObject = stream;
-        audioSrc = ctx.createMediaStreamSource(stream);
+        /*audioSrc = ctx.createMediaStreamSource(stream);
 
         analyser = ctx.createAnalyser();
         analyser.connect(ctx.destination)
         audioSrc.connect(analyser);
         analyser.fftSize = 256;
-        console.log(ctx.sampleRate);
+        console.log(ctx.sampleRate);*/
 
         video.onloadedmetadata = (e) => {
           video.play()
