@@ -5,7 +5,7 @@ const password = localStorage.getItem("password");
 const {
 	ipcRenderer
 } = require("electron");
-const { WebSocket } = require("ws");
+///const { WebSocket } = require("ws");
 
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
@@ -34,7 +34,6 @@ function checkLogin(username, password, server) {
         }
     });
 }
-
 if(!server || !username || !password || !checkLogin(username, password, server)) {
     ipcRenderer.send("loadConnect")
     localStorage.removeItem("username");
@@ -52,7 +51,7 @@ let reconnectInterval = 2000; // milliseconds
 let reconnectTimer = null;
 
 function connectWebSocket() {
-    ws = new WebSocket("wss://" + server + "/");
+    ws = new WebSocket((server.startsWith("localhost") ? "ws" : "wss") + "://" + server + "/");
 
     if(ws.on === undefined) {
         ws.on = function (event, callback) {
