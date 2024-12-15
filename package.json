@@ -15,7 +15,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "electron-builder-squirrel-windows": "^25.0.6",
+    "electron-builder-squirrel-windows": "^25.1.8",
     "custom-electron-titlebar": "^4.2.8",
     "ws": "^8.18.0"
   },
