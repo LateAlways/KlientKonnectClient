@@ -9,9 +9,9 @@ const {
 function checkLogin(username, password, server) {
     return new Promise((resolve) => {
         if (username && password && server) {
-            fetch((!server.startsWith("http://") ?"http://": "") + server).then(res => res.text()).then(text => {
+            fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server).then(res => res.text()).then(text => {
                 if(text === "KlientKonnect is running!") {
-                    fetch((!server.startsWith("http://") ?"http://": "") + server + "/api/connect", {
+                    fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server + "/api/connect", {
                         headers: {
                             "p": password
                         }
@@ -60,6 +60,7 @@ form.addEventListener('submit', async (e) => {
             localStorage.removeItem("username");
             localStorage.removeItem("password");
             localStorage.removeItem("server");
+            document.getElementById("error").innerText = "Invalid login!";
         }
     }
 });

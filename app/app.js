@@ -10,9 +10,9 @@ const { WebSocket } = require("ws");
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
         if (username && password && server) {
-            fetch((!server.startsWith("http://") ?"http://": "") + server).then(res => res.text()).then(text => {
+            fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server).then(res => res.text()).then(text => {
                 if(text === "KlientKonnect is running!") {
-                    fetch((!server.startsWith("http://") ?"http://": "") + server + "/api/connect", {
+                    fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server + "/api/connect", {
                         headers: {
                             "p": password
                         }
@@ -45,7 +45,7 @@ let screensharing = false;
 let incomingMessage = null;
 let resolution
 let offscreen
-fetch("http://" + server + "/api/resolution").then(res => res.json()).then(text => { resolution = text; offscreen = new OffscreenCanvas(resolution.width, resolution.height); offscreen = offscreen.getContext("2d", { willReadFrequently: true })});
+fetch("https://" + server + "/api/resolution").then(res => res.json()).then(text => { resolution = text; offscreen = new OffscreenCanvas(resolution.width, resolution.height); offscreen = offscreen.getContext("2d", { willReadFrequently: true })});
 let ws = null;
 let reconnectInterval = 2000; // milliseconds
 let reconnectTimer = null;
@@ -123,78 +123,92 @@ function byteToDecibel(byte) {
 connectWebSocket();
 
 let last_frame = null;
+
 const encodeImageDataToLATFILE = function(image, full) {
-    /* STRUCTURE OF LATFILE
-    if full then ( 12 bytes reqfullimage marker )
-    11 bytes LATFILE?ENC marker
-    1 byte fps
-    4 bytes colormap length/3 uint32
-    3 bytes per color uint8
-    4 bytes pixels length uint32
-    4-6 bytes per pixel {
-        2 bytes colorswitch? uint16
-        2 bytes x uint16
-        2 bytes y uint16
-    }
-    2 bytes frequency uint16
-    */
     const message = [];
-    if(full) {
+    if (full) {
         message.push(Buffer.from("reqfullimage"));
     }
     message.push(Buffer.from("LATFILE?ENC"));
-    message.push(Buffer.from([60]));
-    let colorMap = [];
-    let pixels = {};
-    for(let x=0; x<resolution.width*resolution.height; x++) {
-        let red = image.data[x*4];
-        let green = image.data[x*4+1];
-        let blue = image.data[x*4+2];
 
-        if(!full && last_frame !== null) {
-            let changeRed = last_frame[x*4] != red;
-            let changeGreen = last_frame[x*4+1] != green;
-            let changeBlue = last_frame[x*4+2] != blue;
-            if(changeRed || changeGreen || changeBlue) {
-                let colormap = colorMap.findIndex(item => item[0] == red && item[1] == green && item[2] == blue);
+    const colorMap = new Map(); // Use a Map for O(1) lookups
+    const pixels = [];
+    let biggest_pixel = 0;
+    for (let x = 0; x < resolution.width * resolution.height; x++) {
+        const red = image.data[x * 4];
+        const green = image.data[x * 4 + 1];
+        const blue = image.data[x * 4 + 2];
 
-                if(colormap == -1) {
-                    colormap = colorMap.length;
-                    colorMap.push([red, green, blue]);
-                }
+        if (!full && last_frame !== null) {
+            const lastRed = last_frame[x * 4];
+            const lastGreen = last_frame[x * 4 + 1];
+            const lastBlue = last_frame[x * 4 + 2];
 
-                if(!pixels[colormap]) pixels[colormap] = [x];
-                else pixels[colormap].push(x);
+            if (lastRed === red && lastGreen === green && lastBlue === blue) {
+                continue; // Skip if no change
             }
-        } else {
-            let colormap = colorMap.findIndex(item => item[0] == red && item[1] == green && item[2] == blue);
-
-            if(colormap == -1) {
-                colormap = colorMap.length;
-                colorMap.push([red, green, blue]);
-            }
-
-            if(!pixels[colormap]) pixels[colormap] = [x];
-            else pixels[colormap].push(x);
         }
+
+        const colorKey = `${red},${green},${blue}`;
+        let colormapIndex = colorMap.get(colorKey);
+
+        if (colormapIndex === undefined) {
+            colormapIndex = colorMap.size;
+            colorMap.set(colorKey, colormapIndex);
+            pixels[colormapIndex] = []; // Initialize the pixel array for this color
+        }
+
+        if(x*4 > biggest_pixel) {
+            biggest_pixel = x*4;
+        }
+
+        pixels[colormapIndex].push(x*4); // Add the pixel index to the corresponding color
     }
 
-    if(colorMap.length !== 0 && Object.keys(pixels).length !== 0) {
-        message.push(Buffer.from(new Uint32Array([colorMap.length]).buffer));
-        colorMap = [].concat.apply([], colorMap)
-        message.push(Buffer.from(colorMap));
-        let pixelSize = Object.keys(pixels).length;
-        let pixelsLength = 0;
-        let pixelss = [];
-        for(let colormap_index = 0; colormap_index < pixelSize; colormap_index++) {
-            if(colormap_index !== 0) pixelss.push(Buffer.from([239,239]));
-            for(let pixel_index = 0; pixel_index < pixels[colormap_index].length; pixel_index++){
-                let pixel = pixels[colormap_index][pixel_index];
-                pixelss.push(Buffer.from(new Uint16Array([pixel]).buffer));
-                pixelsLength++;
+    const colorMapArray = new Uint8Array(colorMap.size * 3);
+    let index = 0;
+
+    for (const [key, value] of colorMap.entries()) {
+        const [r, g, b] = key.split(',').map(Number);
+        colorMapArray[index++] = r;
+        colorMapArray[index++] = g;
+        colorMapArray[index++] = b;
+    }
+
+    if (colorMap.size !== 0 && pixels.length !== 0) {
+        message.push(Buffer.from(new Uint32Array([colorMap.size*3]).buffer));
+        message.push(Buffer.from(colorMapArray));
+
+        message.push(Buffer.from(new Uint8Array([biggest_pixel < 255 ? 1 : biggest_pixel < 65535 ? 2 : 4]).buffer));
+
+        const pixelData = [];
+        let totalPixelsLength = 0;
+
+        for (let colormap_index = 0; colormap_index < pixels.length; colormap_index++) {
+            const pixelList = pixels[colormap_index];
+            const pixelCount = pixelList.length;
+            pixelData.push(Buffer.from(new Uint32Array([pixelCount]).buffer));
+            totalPixelsLength += pixelCount;
+            
+            if(biggest_pixel < 255) {
+                for (const pixel of pixelList) {
+                    pixelData.push(Buffer.from(new Uint8Array([pixel]).buffer));
+                }
+            } else if(biggest_pixel < 65535) {
+                for (const pixel of pixelList) {
+                    pixelData.push(Buffer.from(new Uint16Array([pixel]).buffer));
+                }
+            } else {
+                for (const pixel of pixelList) {
+                    pixelData.push(Buffer.from(new Uint32Array([pixel]).buffer));
+                }
             }
         }
-        messageSend = Buffer.concat([Buffer.concat(message), Buffer.from(new Uint32Array([pixelsLength]).buffer), Buffer.concat(pixelss)/*, Buffer.from(new Uint8Array(getFrequency()).buffer)*/]);
+
+        message.push(Buffer.from(new Uint32Array([totalPixelsLength]).buffer));
+        message.push(Buffer.concat(pixelData)); // Concatenate all pixel data at once
+
+        const messageSend = Buffer.concat(message);
         ws.send(messageSend);
     }
     return 0;
