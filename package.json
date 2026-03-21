@@ -45,8 +45,7 @@
       "executableName": "klientkonnect"
     },
     "squirrelWindows": {
-      "iconUrl": "https://latealways.is-a-good.dev/kklounges.ico",
-      "loadingGif": "assets/kklounges.gif",
+      "iconUrl": "https://cdn.latealways.dev/kklounges.ico",
       "useAppIdAsId": true
     },
     "mac": {
