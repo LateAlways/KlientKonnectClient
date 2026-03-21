@@ -70,6 +70,8 @@ function connectWebSocket() {
         console.log("Disconnected from server!");
         screensharing = false;
         document.getElementById("screenshare").innerText = "Screenshare";
+        document.getElementById("screenshare").classList.remove("active");
+        document.getElementById("status-badge").classList.remove("visible");
         reconnect();
     })
 
@@ -233,6 +235,7 @@ function onFrame(timestamp, frame) {
 
 document.getElementById("username").innerHTML = username;
 document.getElementById("server").innerHTML = server;
+document.getElementById("user-avatar").innerText = username ? username[0].toUpperCase() : "?";
 
 function logout() {
     localStorage.removeItem("username");
@@ -246,7 +249,9 @@ document.getElementById("select").addEventListener("click", () => {
 });
 const video = document.querySelector('video')
 ipcRenderer.on("setSource", (event, args) => {
-    document.getElementById("streaming-src").innerText = args.name.substring(0, 10) + (args.name.length <= 10 ? "" : "...");
+    const srcEl = document.getElementById("streaming-src");
+    srcEl.innerText = args.name.substring(0, 20) + (args.name.length <= 20 ? "" : "...");
+    srcEl.classList.add("selected");
     navigator.webkitGetUserMedia({
         /*audio: {
             mandatory: {
@@ -288,6 +293,8 @@ document.getElementById("screenshare").addEventListener("click", () => {
         ws.send("disconnect")
         last_frame = null;
         document.getElementById("screenshare").innerText = "Screenshare";
+        document.getElementById("screenshare").classList.remove("active");
+        document.getElementById("status-badge").classList.remove("visible");
     } else {
         new Promise((resolve, reject) => {
             incomingMessage = resolve
@@ -297,7 +304,9 @@ document.getElementById("screenshare").addEventListener("click", () => {
             if(message == "connectsuccess") {
                 console.log("Screensharing!");
                 screensharing = true;
-                document.getElementById("screenshare").innerText = "Stop";
+                document.getElementById("screenshare").innerText = "Stop Screenshare";
+                document.getElementById("screenshare").classList.add("active");
+                document.getElementById("status-badge").classList.add("visible");
             } else {
                 console.log("Error while screensharing.");
             }

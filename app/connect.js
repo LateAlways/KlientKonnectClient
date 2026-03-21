@@ -1,10 +1,8 @@
-const usernameInput = mdc.textField.MDCTextField.attachTo(document.querySelector('.username'));
-const passwordInput = mdc.textField.MDCTextField.attachTo(document.querySelector('.password'));
-const serverInput = mdc.textField.MDCTextField.attachTo(document.querySelector('.server'));
+const { ipcRenderer } = require("electron");
 
-const {
-	ipcRenderer
-} = require("electron");
+const usernameInput = document.getElementById('username-input');
+const passwordInput = document.getElementById('password-input');
+const serverInput = document.getElementById('server-input');
 
 function checkLogin(username, password, server) {
     return new Promise((resolve) => {
