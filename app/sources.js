@@ -35,17 +35,17 @@ function createSource(source) {
 }
 setInterval(() => {
     ipcRenderer.invoke("getSources").then((data) => {
-        let changed = [];
+        const changedNames = new Set();
         data.forEach((source) => {
             if(sources[source.name]) {
                 sources[source.name].div.children[0].src = source.thumbnail.toDataURL();
             } else {
                 createSource(source);
             }
-            changed.push(source.name);
+            changedNames.add(source.name);
         });
         Object.keys(sources).forEach((source) => {
-            if(!changed.includes(source)) {
+            if(!changedNames.has(source)) {
                 document.getElementById("sources").removeChild(sources[source].div);
                 delete sources[source];
             }

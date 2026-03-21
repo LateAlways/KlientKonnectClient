@@ -7,12 +7,23 @@ const {
 } = require("electron");
 const { WebSocket } = require("ws");
 
+function getHttpUrl(s) {
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return (s.startsWith("localhost") ? "http://" : "https://") + s;
+}
+
+function getWsUrl(s) {
+    if (s.startsWith("http://")) return "ws://" + s.slice(7);
+    if (s.startsWith("https://")) return "wss://" + s.slice(8);
+    return (s.startsWith("localhost") ? "ws://" : "wss://") + s;
+}
+
 function checkLogin(username, password, server) {
     return new Promise((resolve, reject) => {
         if (username && password && server) {
-            fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server).then(res => res.text()).then(text => {
+            fetch(getHttpUrl(server)).then(res => res.text()).then(text => {
                 if(text === "KlientKonnect is running!") {
-                    fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server + "/api/connect", {
+                    fetch(getHttpUrl(server) + "/api/connect", {
                         headers: {
                             "p": password
                         }
@@ -34,24 +45,26 @@ function checkLogin(username, password, server) {
         }
     });
 }
-if(!server || !username || !password || !checkLogin(username, password, server)) {
-    ipcRenderer.send("loadConnect")
-    localStorage.removeItem("username");
-    localStorage.removeItem("password");
-    localStorage.removeItem("server");
-}
+(async () => {
+    if (!server || !username || !password || !(await checkLogin(username, password, server))) {
+        ipcRenderer.send("loadConnect");
+        localStorage.removeItem("username");
+        localStorage.removeItem("password");
+        localStorage.removeItem("server");
+    }
+})();
 
 let screensharing = false;
 let incomingMessage = null;
 let resolution
 let offscreen
-fetch("https://" + server + "/api/resolution").then(res => res.json()).then(text => { resolution = text; offscreen = new OffscreenCanvas(resolution.width, resolution.height); offscreen = offscreen.getContext("2d", { willReadFrequently: true })});
+fetch(getHttpUrl(server) + "/api/resolution").then(res => res.json()).then(text => { resolution = text; offscreen = new OffscreenCanvas(resolution.width, resolution.height); offscreen = offscreen.getContext("2d", { willReadFrequently: true })});
 let ws = null;
 let reconnectInterval = 2000; // milliseconds
 let reconnectTimer = null;
 
 function connectWebSocket() {
-    ws = new WebSocket((server.startsWith("localhost") ? "ws" : "wss") + "://" + server + "/");
+    ws = new WebSocket(getWsUrl(server) + "/");
 
     if(ws.on === undefined) {
         ws.on = function (event, callback) {
@@ -64,6 +77,7 @@ function connectWebSocket() {
         console.log("Connected to server!");
         ws.send(password);
         clearInterval(reconnectTimer);
+        reconnectTimer = null;
     })
 
     ws.on("close", function (event) {
@@ -100,119 +114,105 @@ function reconnect() {
     }
 }
 
-/*const ctx = new AudioContext({sinkId: { type: 'none' }});
-let audioSrc;
-let analyser;*/
-function getFrequency() {
-    //let l = new Uint8Array(analyser.frequencyBinCount);
-
-    //analyser.getByteFrequencyData(l);
-
-    // transform l into a normal []
-    let arr = [];
-    for(let i = 0; i < /*l.length*/128; i++) {
-        //arr.push(Math.floor(Math.pow(10, byteToDecibel(l[i])/10)*255));
-        arr.push(0);
-    }
-    
-    return arr
-}
-function byteToDecibel(byte) {
-    const MINIMUM_POSITIVE_VALUE = 1e-6;
-    return 20 * Math.log10((byte == 0 ? MINIMUM_POSITIVE_VALUE : byte) / 255);
-}
-
 connectWebSocket();
 
 let last_frame = null;
+let rafId = null;
+
+const MAGIC_HEADER = Buffer.from("LATFILE?ENC");
+const FULL_FRAME_HEADER = Buffer.from("reqfullimage");
 
 const encodeImageDataToLATFILE = function(image, full) {
-    const message = [];
-    if (full) {
-        message.push(Buffer.from("reqfullimage"));
-    }
-    message.push(Buffer.from("LATFILE?ENC"));
+    const data = image.data;
+    const totalPixels = resolution.width * resolution.height;
 
-    const colorMap = new Map(); // Use a Map for O(1) lookups
+    const colorMap = new Map();
+    const colorRGB = []; // flat [r, g, b, r, g, b, ...] for each color in map order
     const pixels = [];
     let biggest_pixel = 0;
-    for (let x = 0; x < resolution.width * resolution.height; x++) {
-        const red = image.data[x * 4];
-        const green = image.data[x * 4 + 1];
-        const blue = image.data[x * 4 + 2];
+    let totalChangedPixels = 0;
 
-        if (!full && last_frame !== null) {
-            const lastRed = last_frame[x * 4];
-            const lastGreen = last_frame[x * 4 + 1];
-            const lastBlue = last_frame[x * 4 + 2];
+    for (let x = 0; x < totalPixels; x++) {
+        const i = x << 2; // x * 4
+        const red = data[i];
+        const green = data[i + 1];
+        const blue = data[i + 2];
 
-            if (lastRed === red && lastGreen === green && lastBlue === blue) {
-                continue; // Skip if no change
-            }
+        if (!full && last_frame !== null &&
+            last_frame[i] === red && last_frame[i + 1] === green && last_frame[i + 2] === blue) {
+            continue;
         }
 
-        const colorKey = `${red},${green},${blue}`;
+        // Pack RGB into a single integer key — avoids per-pixel string allocation
+        const colorKey = (red << 16) | (green << 8) | blue;
         let colormapIndex = colorMap.get(colorKey);
 
         if (colormapIndex === undefined) {
             colormapIndex = colorMap.size;
             colorMap.set(colorKey, colormapIndex);
-            pixels[colormapIndex] = []; // Initialize the pixel array for this color
+            colorRGB.push(red, green, blue);
+            pixels[colormapIndex] = [];
         }
 
-        if(x*4 > biggest_pixel) {
-            biggest_pixel = x*4;
+        if (i > biggest_pixel) {
+            biggest_pixel = i;
         }
 
-        pixels[colormapIndex].push(x*4); // Add the pixel index to the corresponding color
+        pixels[colormapIndex].push(i);
+        totalChangedPixels++;
     }
 
-    const colorMapArray = new Uint8Array(colorMap.size * 3);
-    let index = 0;
+    const numColors = colorMap.size;
+    if (numColors === 0 || pixels.length === 0) return 0;
 
-    for (const [key, value] of colorMap.entries()) {
-        const [r, g, b] = key.split(',').map(Number);
-        colorMapArray[index++] = r;
-        colorMapArray[index++] = g;
-        colorMapArray[index++] = b;
+    const indexFormat = biggest_pixel < 255 ? 1 : biggest_pixel < 65535 ? 2 : 4;
+
+    // Pre-allocate a single output buffer for the entire message
+    const fullHeaderLen = (full ? FULL_FRAME_HEADER.length : 0) + MAGIC_HEADER.length;
+    const colorMapSectionLen = 4 + numColors * 3;
+    const pixelSectionLen = 1 + 4 + numColors * 4 + totalChangedPixels * indexFormat;
+    const output = Buffer.allocUnsafe(fullHeaderLen + colorMapSectionLen + pixelSectionLen);
+    let pos = 0;
+
+    if (full) {
+        FULL_FRAME_HEADER.copy(output, pos);
+        pos += FULL_FRAME_HEADER.length;
+    }
+    MAGIC_HEADER.copy(output, pos);
+    pos += MAGIC_HEADER.length;
+
+    output.writeUInt32LE(numColors * 3, pos); pos += 4;
+
+    // Write color map RGB — colorRGB is already [r,g,b,...] so no re-parsing needed
+    for (let i = 0; i < colorRGB.length; i++) {
+        output[pos++] = colorRGB[i];
     }
 
-    if (colorMap.size !== 0 && pixels.length !== 0) {
-        message.push(Buffer.from(new Uint32Array([colorMap.size*3]).buffer));
-        message.push(Buffer.from(colorMapArray));
+    output[pos++] = indexFormat;
 
-        message.push(Buffer.from(new Uint8Array([biggest_pixel < 255 ? 1 : biggest_pixel < 65535 ? 2 : 4]).buffer));
+    output.writeUInt32LE(totalChangedPixels, pos); pos += 4;
 
-        const pixelData = [];
-        let totalPixelsLength = 0;
+    for (let ci = 0; ci < pixels.length; ci++) {
+        const pixelList = pixels[ci];
+        const pixelCount = pixelList.length;
+        output.writeUInt32LE(pixelCount, pos); pos += 4;
 
-        for (let colormap_index = 0; colormap_index < pixels.length; colormap_index++) {
-            const pixelList = pixels[colormap_index];
-            const pixelCount = pixelList.length;
-            pixelData.push(Buffer.from(new Uint32Array([pixelCount]).buffer));
-            totalPixelsLength += pixelCount;
-            
-            if(biggest_pixel < 255) {
-                for (const pixel of pixelList) {
-                    pixelData.push(Buffer.from(new Uint8Array([pixel]).buffer));
-                }
-            } else if(biggest_pixel < 65535) {
-                for (const pixel of pixelList) {
-                    pixelData.push(Buffer.from(new Uint16Array([pixel]).buffer));
-                }
-            } else {
-                for (const pixel of pixelList) {
-                    pixelData.push(Buffer.from(new Uint32Array([pixel]).buffer));
-                }
+        if (indexFormat === 1) {
+            for (let pi = 0; pi < pixelCount; pi++) {
+                output[pos++] = pixelList[pi];
+            }
+        } else if (indexFormat === 2) {
+            for (let pi = 0; pi < pixelCount; pi++) {
+                output.writeUInt16LE(pixelList[pi], pos); pos += 2;
+            }
+        } else {
+            for (let pi = 0; pi < pixelCount; pi++) {
+                output.writeUInt32LE(pixelList[pi], pos); pos += 4;
             }
         }
-
-        message.push(Buffer.from(new Uint32Array([totalPixelsLength]).buffer));
-        message.push(Buffer.concat(pixelData)); // Concatenate all pixel data at once
-
-        const messageSend = Buffer.concat(message);
-        ws.send(messageSend);
     }
+
+    ws.send(output);
     return 0;
 }
 
@@ -223,14 +223,16 @@ function getFullFrame() {
     last_frame = image.data
 }
 
-function onFrame(timestamp, frame) {
-    requestAnimationFrame(onFrame);
-    if(screensharing) {
-        offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
-        let image = offscreen.getImageData(0, 0, resolution.width, resolution.height)
-        encodeImageDataToLATFILE(image, false);
-        last_frame = image.data
+function onFrame() {
+    if(!screensharing) {
+        rafId = null;
+        return;
     }
+    rafId = requestAnimationFrame(onFrame);
+    offscreen.drawImage(video, 0, 0, resolution.width, resolution.height);
+    let image = offscreen.getImageData(0, 0, resolution.width, resolution.height)
+    encodeImageDataToLATFILE(image, false);
+    last_frame = image.data
 }
 
 document.getElementById("username").innerHTML = username;
@@ -253,13 +255,6 @@ ipcRenderer.on("setSource", (event, args) => {
     srcEl.innerText = args.name.substring(0, 20) + (args.name.length <= 20 ? "" : "...");
     srcEl.classList.add("selected");
     navigator.webkitGetUserMedia({
-        /*audio: {
-            mandatory: {
-                echoCancellation: true,
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: args.id,
-            }
-        },*/
         video: {
             mandatory: {
                 chromeMediaSource: 'desktop',
@@ -269,19 +264,12 @@ ipcRenderer.on("setSource", (event, args) => {
         }
       }, (stream) => {
         video.srcObject = stream;
-        /*audioSrc = ctx.createMediaStreamSource(stream);
-
-        analyser = ctx.createAnalyser();
-        analyser.connect(ctx.destination)
-        audioSrc.connect(analyser);
-        analyser.fftSize = 256;
-        console.log(ctx.sampleRate);*/
-
         video.onloadedmetadata = (e) => {
           video.play()
         }
 
-        onFrame();
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = null;
       }, (err) => {
         console.log(err)
       });
@@ -296,7 +284,7 @@ document.getElementById("screenshare").addEventListener("click", () => {
         document.getElementById("screenshare").classList.remove("active");
         document.getElementById("status-badge").classList.remove("visible");
     } else {
-        new Promise((resolve, reject) => {
+        new Promise((resolve) => {
             incomingMessage = resolve
             ws.send("connect:"+username);
         }).then((message) => {
@@ -307,6 +295,7 @@ document.getElementById("screenshare").addEventListener("click", () => {
                 document.getElementById("screenshare").innerText = "Stop Screenshare";
                 document.getElementById("screenshare").classList.add("active");
                 document.getElementById("status-badge").classList.add("visible");
+                if (rafId === null) rafId = requestAnimationFrame(onFrame);
             } else {
                 console.log("Error while screensharing.");
             }

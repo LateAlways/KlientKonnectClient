@@ -4,12 +4,17 @@ const usernameInput = document.getElementById('username-input');
 const passwordInput = document.getElementById('password-input');
 const serverInput = document.getElementById('server-input');
 
+function getHttpUrl(s) {
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return (s.startsWith("localhost") ? "http://" : "https://") + s;
+}
+
 function checkLogin(username, password, server) {
     return new Promise((resolve) => {
         if (username && password && server) {
-            fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server).then(res => res.text()).then(text => {
+            fetch(getHttpUrl(server)).then(res => res.text()).then(text => {
                 if(text === "KlientKonnect is running!") {
-                    fetch((!(server.startsWith("https://") || server.startsWith("http://")) ?"https://": "") + server + "/api/connect", {
+                    fetch(getHttpUrl(server) + "/api/connect", {
                         headers: {
                             "p": password
                         }
