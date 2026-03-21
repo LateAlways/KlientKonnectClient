@@ -11,6 +11,7 @@ ipcRenderer.invoke("getSources").then((data) => {
 let sources = {};
 function createSource(source) {
     let div = document.createElement("div");
+    div.className = "source-card";
     let img = document.createElement("img");
     img.src = source.thumbnail.toDataURL();
 

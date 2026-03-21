@@ -6,38 +6,102 @@
     <title></title>
     <meta name="maximizeable" content="0">
     <meta name="minimizeable" content="1">
-    <meta name="titlebar-themecolor" content="#1e1e1e">
+    <meta name="titlebar-themecolor" content="#0f0f0f">
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
         body {
-            background-color: #1e1e1e;
-            color: white;
-            font-family: Arial, Helvetica, sans-serif;
+            background-color: #0f0f0f;
+            color: #e8e8e8;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow-y: auto;
+            overflow-x: hidden;
         }
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1e1e1e;
-        }
-        ::-webkit-scrollbar-thumb {
-            background-color: #ffffff;
-            border-radius: 3px;
-        }
-        #sources {
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0f0f0f; }
+        ::-webkit-scrollbar-thumb { background-color: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: #555; }
+
+        .page-header {
+            padding: 12px 14px 8px;
+            border-bottom: 1px solid #1e1e1e;
             display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
-        
+
+        .page-header .logo-icon {
+            width: 20px;
+            height: 20px;
+            background: #405CF5;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .page-header span {
+            font-size: 12px;
+            font-weight: 600;
+            color: #777;
+        }
+
+        #sources {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            padding: 10px 12px 12px;
+        }
+
+        .source-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, transform 0.1s;
+        }
+
+        .source-card:hover {
+            border-color: #405CF5;
+            background: #1f1f2e;
+            transform: translateY(-1px);
+        }
+
+        .source-card:active {
+            transform: scale(0.97);
+        }
+
+        .source-card img {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            display: block;
+            background: #111;
+        }
+
+        .source-card p {
+            font-size: 10px;
+            color: #aaa;
+            padding: 5px 7px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-top: 1px solid #222;
+        }
     </style>
 </head>
 <body>
-    <div id="sources">
-        <h4>Select source: </h4>
+    <div class="page-header">
+        <div class="logo-icon">K</div>
+        <span>Select a source</span>
     </div>
+    <div id="sources"></div>
     <script src="sources.js"></script>
-    
 </body>
 </html>

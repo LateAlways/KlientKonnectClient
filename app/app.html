@@ -6,24 +6,40 @@
     <link rel="stylesheet" href="app.css" />
     <meta name="maximizeable" content="0">
     <meta name="minimizeable" content="1">
-    <meta name="titlebar-themecolor" content="#1e1e1e">
+    <meta name="titlebar-themecolor" content="#0f0f0f">
 </head>
 <body>
     <div class="app">
-        <div class="info">
-            <p><strong>Username: </strong><span id="username"></span></p>
-            <p><strong>Server: </strong><span id="server"></span></p>
+        <div class="header">
+            <div class="logo-icon">K</div>
+            <span class="app-title">KlientKonnect</span>
         </div>
-        <div class="screenshare-settings">
-            <button id="select">Select source</button>
-            <p>Source: <span id="streaming-src"></span></p>
-            <button id="screenshare">Screenshare</button>
+
+        <div class="user-card">
+            <div class="user-avatar" id="user-avatar"></div>
+            <div class="user-details">
+                <div class="user-name" id="username"></div>
+                <div class="user-server" id="server"></div>
+            </div>
+            <div class="status-badge" id="status-badge">
+                <span class="status-dot"></span>
+                <span class="status-text">Live</span>
+            </div>
         </div>
-        <div>
-            <button id="logout">Log-out</button>
+
+        <div class="section">
+            <div class="section-label">Screen Source</div>
+            <div class="source-row">
+                <div class="source-name" id="streaming-src">No source selected</div>
+                <button class="btn-browse" id="select">Browse</button>
+            </div>
         </div>
-        <video src="" hidden muted></video>
+
+        <button class="btn-screenshare" id="screenshare">Screenshare</button>
+
+        <button class="btn-logout" id="logout">Log out</button>
     </div>
+    <video src="" hidden muted></video>
     <script src="app.js"></script>
 </body>
 </html>

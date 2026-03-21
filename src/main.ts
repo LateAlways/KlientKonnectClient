@@ -65,7 +65,7 @@ const createWindow = () => {
         },
         titleBarStyle: 'hidden',
     });
-    win.setBounds({ width: 200, height: 350 })
+    win.setBounds({ width: 280, height: 430 })
     Menu.setApplicationMenu(null);
     win.webContents.setFrameRate(240);
 
@@ -78,12 +78,12 @@ const createWindow = () => {
 
 ipcMain.on("loadApp", (event, arg) => {
     win.loadFile(path.join(__dirname, '../app/app.html'));
-    win.setBounds({ width: 210, height: 400 });
+    win.setBounds({ width: 260, height: 430 });
     win.webContents.setFrameRate(240);
 });
 
 ipcMain.on("loadConnect", (event, arg) => {
-    win.setBounds({ width: 200, height: 350 })
+    win.setBounds({ width: 280, height: 430 })
     win.loadFile(path.join(__dirname, '../app/connect.html'));
     win.webContents.setFrameRate(240);
 });
@@ -96,8 +96,8 @@ ipcMain.on("getSource", async (event, arg) => {
     if (!win2) {
         win2 = new BrowserWindow({
             resizable: false,
-            width: 200,
-            height: 350,
+            width: 480,
+            height: 400,
             webPreferences: {
                 sandbox: false,
                 preload: path.join(__dirname, '../app/preload.js'),
